@@ -1,6 +1,6 @@
 # Continuous Transition
 
-This repo contains code accompaning the paper, Continuous Transition: Improving Sample Efficiency for Continuous Control Problems via MixUp (Lin et al., ICRA 2021).
+This repo contains code accompaning the paper, Continuous Transition: Improving Sample Efficiency for Continuous Control Problems via MixUp [(Lin et al., ICRA 2021)](https://arxiv.org/abs/2011.14487).
 
 ## Dependencies
 
