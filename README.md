@@ -21,5 +21,6 @@ Run our method
 > python examples/mujoco_sac_ct.py
 
 
-Contact
+## Contact
+
 To ask questions or report issues, please open an issue on the issues tracker.
