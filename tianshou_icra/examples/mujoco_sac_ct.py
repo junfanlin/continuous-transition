@@ -35,24 +35,33 @@ def get_args():
     parser.add_argument('--test-num', type=int, default=10)
     parser.add_argument('--logdir', type=str, default='log')
     parser.add_argument('--render', type=float, default=0.)
-    parser.add_argument('--rew-norm', type=bool, default=False)
     parser.add_argument('--auto_alpha', type=bool, default=True)
-    parser.add_argument(
-        '--device', type=str,
-        default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--tor_diff', type=float, default=0.1)
     parser.add_argument('--shared', type=bool, default=False)
     args = parser.parse_known_args()[0]
     return args
 
 def process_tri(batch, rng, beta=1):
+    """
+        We contrust continuous transition here
+        Note that: done_bk is the original done signal from the environment, indicating whether the episode is finished,
+               while done is processed to indicate whether the game is failed. The reason while we need done_bk is we
+               don't want the second transition is not from the same episode. Therefore, if done_bk is true, which means
+               the episode is finished at the first transition, we don't construct continuous transition
+    """
+
+    # beta distribution for sampling the interpolation ratio, where beta is the temperature
     blend_ratio = rng.beta(beta, beta, *batch.rew.shape) * (1 - batch.done_bk)
 
+    # construct continuous transition
     obs = batch.obs + blend_ratio[:, None] * (batch.obs_next - batch.obs)
     obs_next = batch.obs_next + blend_ratio[:, None] * (batch.obs_next_next - batch.obs_next)
     act = batch.act + blend_ratio[:, None] * (batch.act_next - batch.act)
     rew = batch.rew + blend_ratio * (batch.rew_next - batch.rew)
     done = batch.done + blend_ratio * (batch.done_next * 1. - batch.done)
 
+    # replace the original discrete transition
     batch.obs = obs
     batch.obs_next = obs_next
     batch.rew = rew
@@ -63,6 +72,7 @@ def process_tri(batch, rng, beta=1):
     return batch
 
 def test_sac(args=get_args()):
+    # initialize environment
     env = gym.make(args.task)
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
@@ -90,13 +100,13 @@ def test_sac(args=get_args()):
         args.layer_num, args.state_shape, args.action_shape, args.device, hidden_layer_size=args.hidden_size
     ).to(args.device)
     critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.critic_lr)
-
+    # energy-based discriminator
     disc = Critic(
         args.layer_num, np.prod(args.state_shape)+np.prod(args.action_shape), 0, args.device, hidden_layer_size=args.hidden_size,
         output_dim=np.prod(args.state_shape)+1,
     ).to(args.device)
     disc_optim = torch.optim.Adam(disc.parameters(), lr=args.critic_lr)
-
+    # tunable temperature
     beta = torch.ones(1, requires_grad=True, device=args.device)
     beta_optim = torch.optim.Adam([beta], lr=args.critic_lr)
 
@@ -113,10 +123,12 @@ def test_sac(args=get_args()):
     policy = SACMUTRIRB2BPolicy(
         actor, actor_optim, critic1, critic1_optim, critic2, critic2_optim,
         args.tau, args.gamma, alpha,
-        [env.action_space.low[0], env.action_space.high[0]], process_tri=(lambda x, beta: process_tri(x, rng=rng, beta=beta)),
-        reward_normalization=args.rew_norm, ignore_done=False, norm_diff=False, beta=(beta, beta_optim),
-        use_diff=False,
-        discriminator=(disc, disc_optim), tor_diff=0.1
+        [env.action_space.low[0], env.action_space.high[0]],
+        reward_normalization=False, ignore_done=False, norm_diff=False, use_diff=False,
+        process_tri=(lambda x, beta: process_tri(x, rng=rng, beta=beta)), # continuous transition construction
+        beta=(beta, beta_optim), # the tunable temperature
+        discriminator=(disc, disc_optim), # the energy-based discriminator
+        tor_diff=args.tor_diff # the tolerance of distance
     )
     # collector
     if args.training_num == 0:
@@ -126,7 +138,6 @@ def test_sac(args=get_args()):
     train_collector = Collector(
         policy, train_envs, ReplayBufferTriple(args.buffer_size, max_ep_len=max_episode_steps))
     test_collector = Collector(policy, test_envs, mode='test')
-    # train_collector.collect(n_step=args.buffer_size)
     # log
     log_path = os.path.join(args.logdir, args.task, 'sac_ct', str(args.seed))
     writer = SummaryWriter(log_path)
@@ -143,7 +154,7 @@ def test_sac(args=get_args()):
     result = offpolicy_exact_trainer(
         policy, train_collector, test_collector, args.epoch,
         args.step_per_epoch, args.collect_per_step, args.test_num,
-        args.batch_size, stop_fn=stop_fn, save_fn=save_fn, writer=writer, epochs_to_save=[1, 40, 50, 80, 100, 120, 150, 160, 200])
+        args.batch_size, stop_fn=stop_fn, save_fn=save_fn, writer=writer, epochs_to_save=[1, 50, 100, 150, 200])
     assert stop_fn(result['best_reward'])
     train_collector.close()
     test_collector.close()

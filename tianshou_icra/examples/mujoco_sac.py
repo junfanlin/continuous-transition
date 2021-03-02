@@ -35,7 +35,6 @@ def get_args():
     parser.add_argument('--test-num', type=int, default=10)
     parser.add_argument('--logdir', type=str, default='log')
     parser.add_argument('--render', type=float, default=0.)
-    parser.add_argument('--rew-norm', type=bool, default=False)
     parser.add_argument('--auto_alpha', type=bool, default=True)
     parser.add_argument(
         '--device', type=str,
@@ -46,14 +45,13 @@ def get_args():
 
 
 def test_sac(args=get_args()):
+    # initialize environment
     env = gym.make(args.task)
     args.state_shape = env.observation_space.shape or env.observation_space.n
     args.action_shape = env.action_space.shape or env.action_space.n
     args.max_action = env.action_space.high[0]
-    # train_envs = gym.make(args.task)
     train_envs = VectorEnv(
         [lambda: gym.make(args.task) for _ in range(args.training_num)])
-    # test_envs = gym.make(args.task)
     test_envs = SubprocVectorEnv(
         [lambda: gym.make(args.task) for _ in range(args.test_num)])
     # seed
@@ -88,7 +86,7 @@ def test_sac(args=get_args()):
         actor, actor_optim, critic1, critic1_optim, critic2, critic2_optim,
         args.tau, args.gamma, alpha,
         [env.action_space.low[0], env.action_space.high[0]],
-        reward_normalization=args.rew_norm, ignore_done=False)
+        reward_normalization=False, ignore_done=False)
     # collector
     if args.training_num == 0:
         max_episode_steps = train_envs._max_episode_steps
