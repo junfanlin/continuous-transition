@@ -39,9 +39,7 @@ def get_args():
     parser.add_argument('--render', type=float, default=0.)
     parser.add_argument('--rew-norm', type=bool, default=False)
     parser.add_argument('--auto_alpha', type=bool, default=True)
-    parser.add_argument(
-        '--device', type=str,
-        default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--shared', type=bool, default=False)
     args = parser.parse_known_args()[0]
     return args
