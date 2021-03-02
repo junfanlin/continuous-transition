@@ -184,8 +184,8 @@ class TD3MUTRIRB2BPolicy(DDPGPolicy):
         if self.disc is not None:
             targ_blend = torch.FloatTensor(batch.blend)
             trans_mix = self.disc(np.concatenate([batch.obs, batch.act], -1))
-            trans_diff = (trans_mix - (trans_pred + targ_blend * (trans_pred_next - trans_pred))).pow(2).mean(-1,
-                                                                                                          keepdim=True).detach()
+            trans_diff = (trans_mix - (trans_pred + targ_blend * (trans_pred_next - trans_pred))
+                          ).pow(2).mean(-1, keepdim=True).detach()
         if self.beta is not None:
             beta_loss = (beta.log() * (trans_diff - self.tor_diff)).mean()
 

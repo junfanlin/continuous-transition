@@ -147,22 +147,6 @@ class TD3Policy(DDPGPolicy):
                 batch.rew = self.norm_func(batch.rew)
         return batch
 
-    # def _target_q(self, buffer: ReplayBuffer,
-    #               indice: np.ndarray) -> torch.Tensor:
-    #     batch = buffer[indice]  # batch.obs: s_{t+n}
-    #     with torch.no_grad():
-    #         a_ = self(batch, model='actor_old', input='obs_next').act
-    #         dev = a_.device
-    #         noise = torch.randn(size=a_.shape, device=dev) * self._policy_noise
-    #         if self._noise_clip > 0:
-    #             noise = noise.clamp(-self._noise_clip, self._noise_clip)
-    #         a_ += noise
-    #         a_ = a_.clamp(self._range[0], self._range[1])
-    #         target_q = torch.min(
-    #             self.critic1_old(batch.obs_next, a_),
-    #             self.critic2_old(batch.obs_next, a_))
-    #     return target_q
-
     def learn(self, batch: Batch, **kwargs) -> Dict[str, float]:
         with torch.no_grad():
             a_ = self(batch, model='actor_old', input='obs_next', deterministic=True).act

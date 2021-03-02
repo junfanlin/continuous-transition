@@ -129,7 +129,7 @@ def test_td3(args=get_args()):
         process_tri=(lambda x, beta: process_tri(x, rng=rng, beta=beta)), # continuous transition construction
         beta=(beta, beta_optim), # the tunable temperature
         discriminator=(disc, disc_optim), # the energy-based discriminator
-        tor_diff=0.1  # the tolerance of distance
+        tor_diff=args.tor_diff  # the tolerance of distance
     )
 
     # collector
